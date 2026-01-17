@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Encruzilhada: Faroeste de Cartas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Rye&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --wood-dark: #3e2723;
+            --wood-light: #5d4037;
+            --parchment: #f5f5dc;
+            --blood: #8a0303;
+            --brass: #d4af37;
+        }
+
+        body {
+            background-color: #2a1a12;
+            background-image: 
+                radial-gradient(circle, rgba(0,0,0,0.2) 20%, rgba(0,0,0,0.8) 90%),
+                url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+            color: var(--parchment);
+            font-family: 'Courier Prime', monospace;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h1, h2, h3, .western-font {
+            font-family: 'Rye', serif;
+        }
+
+        /* Card Styling */
+        .card {
+            background-color: #e8dcc5;
+            background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d3c1a5' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H0V20zM20 0h20v20H20V0z'/%3E%3C/g%3E%3C/svg%3E");
+            color: #2a1a12;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5), inset 0 0 20px rgba(139, 69, 19, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        .card:active {
+            transform: scale(0.95);
+        }
+
+        .card.selected {
+            border: 3px solid var(--blood);
+            transform: translateY(-10px);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.6);
+        }
+
+        .card.disabled {
+            filter: grayscale(100%) opacity(0.5);
+            pointer-events: none;
+        }
+
+        .grid-dynamic {
+            display: grid;
+            gap: 0.75rem;
+            width: 100%;
+        }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+        .heart {
+            color: #ef4444;
+            text-shadow: 0 0 2px #000;
+        }
+        .heart.lost {
+            color: #451a03;
+            opacity: 0.5;
+        }
+
+        .role-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .role-outlaw { background-color: #7f1d1d; color: #fecaca; border: 1px solid #ef4444; }
+        .role-hunter { background-color: #14532d; color: #bbf7d0; border: 1px solid #22c55e; }
+
+        /* Animations */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        @keyframes muzzle-flash {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .flash {
+            animation: muzzle-flash 0.1s;
+        }
+
+        .hidden-screen {
+            display: none;
+        }
+
+        /* Avatar styling */
+        .avatar-ring {
+            transition: all 0.3s ease;
+        }
+        .avatar-ring.targetable:hover {
+            border-color: var(--blood);
+            transform: scale(1.1);
+            cursor: pointer;
+        }
+        .avatar-ring.selected-target {
+            border-color: var(--blood);
+            box-shadow: 0 0 15px var(--blood);
+        }
+
+        /* Cutscenes */
+        .cutscene-overlay {
+            position: fixed;
+            inset: 0;
+            background: black;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+        .cutscene-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .cutscene-text {
+            font-size: 3rem;
+            color: var(--brass);
+            text-align: center;
+            font-family: 'Rye', serif;
+            transform: scale(0.8);
+            transition: transform 3s ease-out;
+        }
+        .cutscene-overlay.active .cutscene-text {
+            transform: scale(1.1);
+        }
+
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-between p-4">
+
+    <!-- CUTSCENE SYSTEM -->
+    <div id="cutscene-overlay" class="cutscene-overlay">
+        <h1 id="cutscene-text" class="cutscene-text">DUELO</h1>
+    </div>
+
+    <!-- AUDIO SYSTEM (Hidden) -->
+    <div id="audio-system"></div>
+
+    <!-- MODE SELECT (First Screen) -->
+    <div id="screen-mode-select" class="w-full max-w-md h-full flex flex-col justify-center items-center text-center space-y-8">
+        <div class="space-y-2">
+            <h1 class="text-5xl text-amber-500 tracking-wider drop-shadow-lg western-font">ENCRUZILHADA</h1>
+            <p class="text-lg opacity-80 border-t border-b border-amber-800 py-2">Escolha o Jogo</p>
+        </div>
+
+        <div class="flex flex-col gap-4 w-full px-8">
+            <button onclick="selectGameType('classic')" class="card p-4 text-xl font-bold hover:bg-amber-100 relative group">
+                <div class="absolute -top-3 -right-3 text-3xl group-hover:rotate-12 transition-transform">🌵</div>
+                🤠 Clássico
+                <span class="block text-sm font-normal opacity-70 mt-1">Duelo Rápido (1 Vida)</span>
+                <span class="block text-xs font-normal opacity-50">Tiro • Escudo • Recarga</span>
+            </button>
+            <button onclick="selectGameType('bluff')" class="card p-4 text-xl font-bold hover:bg-amber-100 border-2 border-red-900/30 relative group">
+                <div class="absolute -top-3 -right-3 text-3xl group-hover:rotate-12 transition-transform">🃏</div>
+                🎭 Blefe
+                <span class="block text-sm font-normal opacity-70 mt-1">Caçada (3 Vidas vs 1 Vida)</span>
+                <span class="block text-xs font-normal opacity-50">Caçe o Foragido ou Sobreviva</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- CONNECTION MENU (Second Screen) -->
+    <div id="screen-menu" class="hidden-screen w-full max-w-md h-full flex flex-col justify-center items-center text-center space-y-8">
+        <h2 class="text-3xl text-amber-500 western-font" id="menu-title">Modo Clássico</h2>
+        
+        <div class="flex flex-col gap-4 w-full px-8">
+            <button onclick="startGame('pve')" class="card p-4 text-lg font-bold hover:bg-amber-100">
+                🤖 Vs IA
+                <span class="block text-xs font-normal opacity-70">Treine contra o computador</span>
+            </button>
+            <button onclick="startGame('pvp')" class="card p-4 text-lg font-bold hover:bg-amber-100">
+                📱 PvP Local
+                <span class="block text-xs font-normal opacity-70">3 Jogadores, 1 Celular</span>
+            </button>
+            <button onclick="showMultiplayerOptions()" class="card p-4 text-lg font-bold hover:bg-amber-100">
+                🌐 Multiplayer
+                <span class="block text-xs font-normal opacity-70">Criar ou Entrar em Sala</span>
+            </button>
+        </div>
+        <button onclick="backToModes()" class="text-amber-500 underline text-sm">Voltar</button>
+    </div>
+
+    <!-- MULTIPLAYER OPTIONS -->
+    <div id="screen-multi-opt" class="hidden-screen w-full max-w-md h-full flex flex-col justify-center items-center text-center space-y-8">
+        <h2 class="text-3xl text-amber-500 western-font">Saloon Online</h2>
+        <div class="flex flex-col gap-4 w-full px-8">
+            <button onclick="startOnline('create')" class="card p-6 text-xl font-bold hover:bg-amber-100">
+                🏠 Criar Sala
+                <span class="block text-xs font-normal opacity-70 mt-2">Você será o anfitrião</span>
+            </button>
+            <button onclick="startOnline('join')" class="card p-6 text-xl font-bold hover:bg-amber-100">
+                🔍 Procurar Sala
+                <span class="block text-xs font-normal opacity-70 mt-2">Digite o código da mesa</span>
+            </button>
+        </div>
+        <button onclick="backToMenu()" class="text-amber-500 underline text-sm">Voltar</button>
+    </div>
+
+    <!-- ONLINE LOBBY -->
+    <div id="screen-lobby" class="hidden-screen w-full max-w-md h-full flex flex-col justify-center items-center text-center space-y-6">
+        <h2 class="text-3xl text-amber-500 western-font">Mesa de Jogo</h2>
+        
+        <!-- Join View -->
+        <div id="lobby-join" class="hidden w-full space-y-4">
+            <p class="text-amber-100">Digite o código da mesa:</p>
+            <input type="number" id="lobby-code-input" class="text-3xl tracking-widest text-center w-full p-2 rounded bg-amber-100 text-black border-4 border-amber-900" placeholder="000">
+            <button onclick="simulateJoin()" class="card w-full py-3 font-bold">ENTRAR</button>
+        </div>
+
+        <!-- Create View -->
+        <div id="lobby-create" class="hidden w-full space-y-4 bg-black/30 p-6 rounded-lg border border-amber-900/50">
+            <label class="block text-sm mb-2">Seu Código</label>
+            <div id="host-code" class="text-5xl font-mono text-amber-500 tracking-[1rem] font-bold">---</div>
+            <div class="space-y-2 mt-4 text-left px-4">
+                <div class="flex justify-between text-sm border-b border-white/10 pb-1">
+                    <span>🤠 Você</span>
+                    <span class="text-green-400">Pronto</span>
+                </div>
+                <div class="flex justify-between text-sm border-b border-white/10 pb-1 opacity-50" id="lobby-p2">
+                    <span>👤 ...</span>
+                    <span>Aguardando</span>
+                </div>
+                <div class="flex justify-between text-sm border-b border-white/10 pb-1 opacity-50" id="lobby-p3">
+                    <span>👤 ...</span>
+                    <span>Aguardando</span>
+                </div>
+            </div>
+            <p class="text-xs animate-pulse text-amber-200 mt-4">Esperando jogadores...</p>
+        </div>
+
+        <button onclick="backToMultiOpt()" class="text-amber-500 underline">Cancelar</button>
+    </div>
+
+    <!-- GAME AREA -->
+    <div id="screen-game" class="hidden-screen w-full h-full max-w-lg flex flex-col relative">
+        
+        <!-- Top Info Bar -->
+        <div class="flex justify-between items-center bg-black/40 p-2 rounded-lg mb-4 border-b border-amber-900/50">
+            <span class="text-amber-500 text-sm">RODADA <span id="round-counter">1</span></span>
+            <span id="mode-indicator" class="text-xs uppercase tracking-widest opacity-60">DUELO</span>
+            <button onclick="location.reload()" class="text-xs border border-amber-900 px-2 py-1 rounded hover:bg-amber-900">SAIR</button>
+        </div>
+
+        <!-- Opponents Area -->
+        <div class="flex justify-between px-4 mb-8">
+            <!-- Opponent 1 (Left) -->
+            <div id="p2-area" class="flex flex-col items-center w-1/3 transition-opacity duration-500">
+                <div class="relative">
+                    <div id="p2-avatar" class="avatar-ring w-20 h-20 rounded-full bg-slate-800 border-4 border-amber-900 flex items-center justify-center text-3xl shadow-lg relative overflow-hidden">
+                        👺
+                        <div id="p2-flash" class="absolute inset-0 bg-yellow-200 opacity-0 pointer-events-none"></div>
+                    </div>
+                    <!-- Status Badge -->
+                    <div id="p2-ammo" class="absolute -bottom-2 -right-2 bg-yellow-600 text-black text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border border-white">1</div>
+                </div>
+                <div class="mt-2 text-center">
+                    <div id="p2-name" class="font-bold text-sm truncate w-full">O Foragido</div>
+                    <div id="p2-action-display" class="text-xs text-amber-300 h-4">...</div>
+                </div>
+            </div>
+
+            <!-- VS / Messages -->
+            <div class="w-1/3 flex flex-col justify-center items-center text-center px-1">
+                <div id="game-message" class="text-sm leading-tight text-amber-100 font-bold min-h-[3rem] flex items-center justify-center">
+                    Escolha sua jogada
+                </div>
+            </div>
+
+            <!-- Opponent 2 (Right) -->
+            <div id="p3-area" class="flex flex-col items-center w-1/3 transition-opacity duration-500">
+                <div class="relative">
+                    <div id="p3-avatar" class="avatar-ring w-20 h-20 rounded-full bg-slate-800 border-4 border-amber-900 flex items-center justify-center text-3xl shadow-lg relative overflow-hidden">
+                        👮
+                        <div id="p3-flash" class="absolute inset-0 bg-yellow-200 opacity-0 pointer-events-none"></div>
+                    </div>
+                    <div id="p3-ammo" class="absolute -bottom-2 -right-2 bg-yellow-600 text-black text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border border-white">1</div>
+                </div>
+                <div class="mt-2 text-center">
+                    <div id="p3-name" class="font-bold text-sm truncate w-full">O Xerife</div>
+                    <div id="p3-action-display" class="text-xs text-amber-300 h-4">...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Table Area (Cards played) -->
+        <div class="flex-grow flex items-center justify-center relative mb-4">
+            <div class="w-full h-32 border-2 border-dashed border-amber-900/30 rounded-xl flex items-center justify-center">
+                <div id="resolution-area" class="grid grid-cols-3 gap-2 w-full px-2 opacity-0 transition-opacity duration-500">
+                    <!-- Cards Revealed Here -->
+                    <div id="card-p2" class="card h-24 flex items-center justify-center text-2xl border border-black/20">?</div>
+                    <div id="card-p1" class="card h-24 flex items-center justify-center text-2xl border-2 border-amber-500 transform scale-110 z-10">?</div>
+                    <div id="card-p3" class="card h-24 flex items-center justify-center text-2xl border border-black/20">?</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Controls -->
+        <div id="player-controls" class="mt-auto pb-4">
+            <div class="flex justify-between items-end px-4 mb-2">
+                <div class="text-left">
+                    <div id="p1-name" class="text-xl western-font text-amber-500">Você</div>
+                    <div class="text-xs opacity-60">Sua vez</div>
+                </div>
+                <div class="flex items-center gap-2">
+                     <span class="text-xs uppercase mr-1">Munição</span>
+                     <div class="flex gap-1" id="p1-ammo-display">
+                         <div class="w-3 h-8 bg-yellow-500 rounded-sm border border-yellow-700 shadow-sm"></div>
+                     </div>
+                </div>
+            </div>
+
+            <!-- Action Cards -->
+            <div id="action-cards-container" class="grid grid-cols-3 gap-3 px-2 h-40">
+                <!-- Initial buttons will be rendered by JS -->
+            </div>
+            
+            <!-- Confirmation / Target Prompt -->
+            <div id="action-prompt" class="h-12 mt-2 flex items-center justify-center px-4">
+                <p class="text-sm text-amber-200 animate-pulse hidden" id="target-msg">SELECIONE UM ALVO ACIMA</p>
+                <button id="btn-confirm" onclick="confirmTurn()" class="hidden w-full bg-amber-700 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded shadow-lg western-font text-lg border-2 border-amber-900">
+                    CONFIRMAR
+                </button>
+                <button id="btn-spectate" onclick="runSpectatorTurn()" class="hidden w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow-lg western-font text-lg border-2 border-gray-900">
+                    ASSISTIR RODADA
+                </button>
+                <p id="msg-waiting" class="hidden text-amber-300 animate-pulse">Aguardando oponentes...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- INTERSTITIAL (Pass the Phone) -->
+    <div id="screen-interstitial" class="hidden-screen fixed inset-0 z-50 bg-black flex flex-col items-center justify-center text-center p-8">
+        <h2 class="text-3xl text-amber-500 mb-4 western-font">Próximo Jogador</h2>
+        <p class="mb-8 text-lg">Passe o dispositivo para:</p>
+        <div id="next-player-name" class="text-4xl font-bold text-white mb-12">Jogador 2</div>
+        <button onclick="revealTurn()" class="card px-8 py-4 text-xl font-bold">
+            Estou Pronto
+        </button>
+    </div>
+
+    <!-- GAME OVER -->
+    <div id="screen-gameover" class="hidden-screen fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center text-center p-8">
+        <h1 id="end-title" class="text-5xl text-amber-500 mb-4 western-font">Fim de Jogo</h1>
+        <p id="end-reason" class="text-xl text-white mb-8">O pó baixou...</p>
+        <div id="winner-display" class="text-6xl mb-8">🤠</div>
+        <button onclick="location.reload()" class="card px-8 py-4 text-xl font-bold">
+            Jogar Novamente
+        </button>
+    </div>
+
+    <script>
+        // --- HELPERS ---
+        function playCutscene(text, duration = 2000) {
+            const el = document.getElementById('cutscene-overlay');
+            const txt = document.getElementById('cutscene-text');
+            txt.innerText = text;
+            el.classList.add('active');
+            AudioEngine.cutscene();
+            setTimeout(() => {
+                el.classList.remove('active');
+            }, duration);
+        }
+
+        // --- NETWORK ENGINE (PeerJS) ---
+        const Network = {
+            peer: null,
+            conn: [],
+            isHost: false,
+            myId: null,
+            roomCode: null,
+            
+            init: function(isHost, code = null) {
+                this.isHost = isHost;
+                const prefix = "encruzilhada-game-v2-";
+                
+                // Disconnect previous peer if exists
+                if(this.peer) this.peer.destroy();
+
+                if (isHost) {
+                    this.roomCode = Math.floor(100 + Math.random() * 900); // 3 digit code
+                    this.peer = new Peer(prefix + this.roomCode);
+                    
+                    document.getElementById('host-code').innerText = this.roomCode;
+                    
+                    this.peer.on('open', (id) => {
+                        console.log('Host Open: ' + id);
+                        this.setupHostListeners();
+                    });
+                } else {
+                    this.roomCode = code;
+                    this.peer = new Peer(); // Auto ID for client
+                    
+                    this.peer.on('open', (id) => {
+                        console.log('Client Open: ' + id);
+                        this.connectToHost(prefix + code);
+                    });
+                }
+
+                this.peer.on('error', (err) => {
+                    console.error(err);
+                    alert("Erro de conexão: " + err.type);
+                    backToMultiOpt();
+                });
+            },
+
+            setupHostListeners: function() {
+                this.conn = [];
+                this.peer.on('connection', (c) => {
+                    if (this.conn.length >= 2) {
+                        c.close(); // Room full
+                        return;
+                    }
+                    this.conn.push(c);
+                    this.setupDataHandler(c, this.conn.length); // ID 1 or 2
+                    
+                    // Update Lobby UI
+                    const slot = this.conn.length + 1; // P2 or P3
+                    document.getElementById(`lobby-p${slot}`).classList.remove('opacity-50');
+                    document.getElementById(`lobby-p${slot}`).innerHTML = `<span>👤 Jogador ${slot}</span><span class="text-green-400">Conectado</span>`;
+                    AudioEngine.click();
+
+                    if (this.conn.length === 2) {
+                        setTimeout(() => startGame('online'), 1000);
+                    }
+                });
+            },
+
+            connectToHost: function(hostId) {
+                const conn = this.peer.connect(hostId);
+                conn.on('open', () => {
+                    this.conn = [conn]; // Client only has 1 connection (to host)
+                    document.querySelector('#lobby-join button').innerText = "CONECTADO! AGUARDANDO...";
+                    
+                    conn.on('data', (data) => {
+                        this.handleClientData(data);
+                    });
+                });
+                conn.on('error', (err) => {
+                    alert("Sala não encontrada!");
+                    document.querySelector('#lobby-join button').innerText = "ENTRAR";
+                });
+            },
+
+            setupDataHandler: function(conn, playerId) {
+                conn.on('data', (data) => {
+                    if (this.isHost) {
+                        Game.handleNetworkAction(playerId, data);
+                    }
+                });
+                conn.on('close', () => {
+                    // Handle disconnect
+                });
+            },
+
+            handleClientData: function(data) {
+                if (data.type === 'START') {
+                    // Initialize Game
+                    Game.myPlayerId = data.yourId; // 1 or 2
+                    Game.gameType = data.gameType;
+                    startGame('online-client');
+                }
+                if (data.type === 'STATE') {
+                    Game.syncState(data.state);
+                }
+                if (data.type === 'SHOWDOWN') {
+                    playCutscene("SHOWDOWN", 1500);
+                    setTimeout(() => {
+                         Game.playResolution(data.logs, data.dmgMap, data.finalState);
+                    }, 1500);
+                }
+                if (data.type === 'GAMEOVER') {
+                     Game.syncState(data.state); // Sync final health
+                     setTimeout(() => {
+                        endGame(data.winners, data.reason);
+                     }, 2000);
+                }
+            },
+
+            broadcast: function(data) {
+                if (!this.isHost) return;
+                this.conn.forEach(c => c.send(data));
+            },
+
+            sendAction: function(action, target) {
+                if (this.isHost) return; 
+                this.conn[0].send({ type: 'ACTION', action, target });
+            }
+        };
+
+        // --- AUDIO ENGINE ---
+        const AudioEngine = {
+            ctx: null,
+            init: function() {
+                window.AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+            },
+            playTone: function(freq, type, duration, vol = 0.1) {
+                if (!this.ctx) this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+            click: function() { this.playTone(800, 'square', 0.05, 0.05); },
+            cutscene: function() { 
+                if (!this.ctx) this.init();
+                this.playTone(100, 'sawtooth', 2.0, 0.2); 
+            },
+            shoot: function() { 
+                if (!this.ctx) this.init();
+                const bufferSize = this.ctx.sampleRate * 0.5;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = this.ctx.createGain();
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                gain.gain.setValueAtTime(1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                noise.start();
+            },
+            reload: function() {
+                this.playTone(600, 'square', 0.05, 0.1);
+                setTimeout(() => this.playTone(700, 'square', 0.05, 0.1), 100);
+            },
+            shield: function() { this.playTone(150, 'sine', 0.4, 0.3); },
+            empty: function() { this.playTone(1200, 'triangle', 0.05, 0.05); },
+            win: function() {
+                if (!this.ctx) this.init();
+                [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => this.playTone(f, 'square', 0.2, 0.1), i * 150));
+            },
+            lose: function() {
+                if (!this.ctx) this.init();
+                [300, 280, 260, 200].forEach((f, i) => setTimeout(() => this.playTone(f, 'sawtooth', 0.4, 0.2), i * 300));
+            }
+        };
+
+        // --- GAME STATE ---
+        const Game = {
+            gameType: 'classic', 
+            mode: null, 
+            players: [],
+            round: 1,
+            currentPlayerIndex: 0, 
+            state: 'menu',
+            myPlayerId: 0,
+            netActionsReceived: 0,
+
+            syncState: function(serverState) {
+                this.players = serverState.players;
+                this.round = serverState.round;
+                // Keep my ID unless reset
+                if (this.mode !== 'online') this.currentPlayerIndex = 0;
+                else this.currentPlayerIndex = this.myPlayerId;
+                
+                updateUI();
+                
+                const me = this.players[this.myPlayerId];
+                if (!me.alive) {
+                    document.getElementById('action-cards-container').classList.add('hidden');
+                    document.getElementById('action-prompt').classList.add('hidden');
+                    if(this.mode === 'pve') {
+                         document.getElementById('game-message').innerText = "Você morreu. Espectador.";
+                         // Auto spectate
+                         setTimeout(resolveAiTurns, 1000); 
+                    } else {
+                         document.getElementById('msg-waiting').innerText = "Espectador...";
+                         document.getElementById('msg-waiting').classList.remove('hidden');
+                    }
+                } else {
+                    document.getElementById('action-cards-container').classList.remove('hidden');
+                    document.getElementById('action-prompt').classList.remove('hidden');
+                    document.getElementById('btn-confirm').classList.add('hidden');
+                    document.getElementById('msg-waiting').classList.add('hidden');
+                    document.querySelectorAll('.card').forEach(el => el.classList.remove('selected'));
+                }
+            },
+
+            handleNetworkAction: function(pid, data) {
+                if (data.type === 'ACTION') {
+                    const p = this.players[pid];
+                    p.action = data.action;
+                    p.target = data.target;
+                    // Only count if player is actually alive
+                    if (p.alive) {
+                        this.netActionsReceived++;
+                        updateUI(); // Show "Ready" status
+                        this.checkNetworkTurn();
+                    }
+                }
+            },
+
+            checkNetworkTurn: function() {
+                const livingPlayers = this.players.filter(p => p.alive);
+                
+                // Count how many living players have an action set
+                // (Note: handleNetworkAction sets action for clients. Host sets own action locally.)
+                let actionsSet = 0;
+                livingPlayers.forEach(p => {
+                    if (p.action) actionsSet++;
+                });
+                
+                if (actionsSet === livingPlayers.length) {
+                    playCutscene("SHOWDOWN", 1500);
+                    setTimeout(() => {
+                        Network.broadcast({ type: 'SHOWDOWN' }); // Signal clients to cutscene
+                        resolveRound();
+                    }, 1500);
+                }
+            },
+
+            playResolution: function(logs, dmgMap, finalState) {
+                const cardArea = document.getElementById('resolution-area');
+                cardArea.style.opacity = '1';
+                
+                const pCenter = this.players[this.myPlayerId];
+                const pLeft = this.players[(this.myPlayerId + 1) % 3];
+                const pRight = this.players[(this.myPlayerId + 2) % 3];
+
+                document.getElementById('card-p1').innerText = ACTION_ICONS[pCenter.action] || '💀';
+                document.getElementById('card-p2').innerText = ACTION_ICONS[pLeft.action] || '💀';
+                document.getElementById('card-p3').innerText = ACTION_ICONS[pRight.action] || '💀';
+
+                this.players.forEach(p => {
+                    if (p.action === 'shoot') {
+                        AudioEngine.shoot();
+                        triggerFlash(p.id);
+                    } else if (p.action === 'shield') {
+                        AudioEngine.shield();
+                    } else if (p.action === 'reload') {
+                        AudioEngine.reload();
+                    }
+                });
+
+                let delay = 0;
+                logs.forEach((log) => {
+                    setTimeout(() => showMessage(log), delay);
+                    delay += 1500;
+                });
+
+                setTimeout(() => {
+                    cardArea.style.opacity = '0';
+                    this.syncState(finalState);
+                    // Win condition checked by Host
+                }, delay + 1000);
+            }
+        };
+
+        const ACTION_ICONS = {
+            'shoot': '🔫',
+            'shield': '🛡️',
+            'reload': '🔄',
+            'steal': '💰',
+            'mirror': '🪞',
+            'none': '?'
+        };
+
+        // --- MENUS ---
+        function selectGameType(type) {
+            AudioEngine.click();
+            Game.gameType = type;
+            document.getElementById('screen-mode-select').classList.add('hidden-screen');
+            document.getElementById('screen-menu').classList.remove('hidden-screen');
+            document.getElementById('menu-title').innerText = type === 'classic' ? 'Modo Clássico' : 'Modo Blefe';
+        }
+        function backToModes() {
+            AudioEngine.click();
+            document.getElementById('screen-menu').classList.add('hidden-screen');
+            document.getElementById('screen-mode-select').classList.remove('hidden-screen');
+        }
+        function showMultiplayerOptions() {
+            AudioEngine.click();
+            document.getElementById('screen-menu').classList.add('hidden-screen');
+            document.getElementById('screen-multi-opt').classList.remove('hidden-screen');
+        }
+        function backToMenu() {
+            AudioEngine.click();
+            document.getElementById('screen-multi-opt').classList.add('hidden-screen');
+            document.getElementById('screen-menu').classList.remove('hidden-screen');
+        }
+        function startOnline(action) {
+            AudioEngine.click();
+            document.getElementById('screen-multi-opt').classList.add('hidden-screen');
+            document.getElementById('screen-lobby').classList.remove('hidden-screen');
+            
+            if (action === 'create') {
+                document.getElementById('lobby-create').classList.remove('hidden');
+                document.getElementById('lobby-join').classList.add('hidden');
+                Network.init(true);
+            } else {
+                document.getElementById('lobby-create').classList.add('hidden');
+                document.getElementById('lobby-join').classList.remove('hidden');
+            }
+        }
+        function simulateJoin() { // Actually Real Join Now
+            const code = document.getElementById('lobby-code-input').value;
+            if (code.length < 3) return;
+            AudioEngine.click();
+            document.querySelector('#lobby-join button').innerText = "CONECTANDO...";
+            Network.init(false, code);
+        }
+        function backToMultiOpt() {
+            AudioEngine.click();
+            document.getElementById('screen-lobby').classList.add('hidden-screen');
+            document.getElementById('screen-multi-opt').classList.remove('hidden-screen');
+            if(Network.peer) Network.peer.destroy();
+            // Reset UI
+            document.querySelector('#lobby-join button').innerText = "ENTRAR";
+        }
+
+        // --- LOGIC ---
+        function initPlayers(mode) {
+            const isBlefe = Game.gameType === 'bluff';
+            let players = [];
+            
+            const createPlayer = (id, name, type, avatar, role) => {
+                let hp = 1;
+                let ammo = 1;
+                let maxAmmo = 1;
+                
+                if (isBlefe) {
+                    if (role === 'outlaw') {
+                        hp = 3;
+                        ammo = 2;
+                        maxAmmo = 2;
+                    } else {
+                        hp = 1;
+                        ammo = 1;
+                        maxAmmo = 1;
+                    }
+                }
+                return { id, name, type, avatar, hp, maxHp: hp, ammo, maxAmmo, role: isBlefe ? role : 'classic', alive: true, action: null, target: null };
+            };
+
+            if (mode === 'pve') {
+                // Configuração das IAs
+                if (isBlefe) {
+                    // Modo Blefe: Você é um Caçador, A IA 1 é o Foragido (Boss)
+                    players = [
+                        createPlayer(0, 'Você', 'human', '🤠', 'hunter'),
+                        createPlayer(1, 'O Foragido', 'ai', '👺', 'outlaw'),
+                        createPlayer(2, 'O Xerife', 'ai', '👮', 'hunter')
+                    ];
+                } else {
+                    // Modo Clássico
+                    players = [
+                        createPlayer(0, 'Você', 'human', '🤠', 'classic'),
+                        createPlayer(1, 'O Foragido', 'ai', '👺', 'classic'),
+                        createPlayer(2, 'O Xerife', 'ai', '👮', 'classic')
+                    ];
+                }
+            } else if (mode === 'pvp') {
+                players = [
+                    createPlayer(0, 'Jogador 1', 'human', '🤠', isBlefe ? 'outlaw' : 'classic'),
+                    createPlayer(1, 'Jogador 2', 'human', '👺', 'hunter'),
+                    createPlayer(2, 'Jogador 3', 'human', '👽', 'hunter')
+                ];
+            } else if (mode === 'online') {
+                players = [
+                    createPlayer(0, 'Host (Você)', 'human', '🤠', isBlefe ? 'outlaw' : 'classic'),
+                    createPlayer(1, 'Jogador 2', 'human', '👺', 'hunter'),
+                    createPlayer(2, 'Jogador 3', 'human', '👽', 'hunter')
+                ];
+            } 
+            return players;
+        }
+
+        function startGame(mode) {
+            AudioEngine.click();
+            Game.mode = mode;
+            
+            // Only host or offline initializes players. Clients wait for state.
+            if (mode !== 'online-client') {
+                Game.players = initPlayers(mode);
+            }
+            
+            Game.round = 1;
+            Game.state = 'input';
+            Game.currentPlayerIndex = 0;
+
+            document.getElementById('screen-menu').classList.add('hidden-screen');
+            document.getElementById('screen-lobby').classList.add('hidden-screen'); 
+            document.getElementById('screen-game').classList.remove('hidden-screen');
+            
+            let modeTitle = mode === 'pve' ? 'SOLO' : (mode === 'pvp' ? 'LOCAL' : 'ONLINE');
+            if (Game.gameType === 'bluff') modeTitle += ' - BLEFE';
+            document.getElementById('mode-indicator').innerText = modeTitle;
+            
+            renderActionCards();
+            updateUI();
+            playCutscene("O DUELO");
+
+            if (mode === 'pvp') setTimeout(startTurnPvP, 2000);
+            
+            if (mode === 'online') {
+                Game.myPlayerId = 0;
+                Game.netActionsReceived = 0;
+                // Host broadcast
+                Network.conn[0].send({ type: 'START', yourId: 1, gameType: Game.gameType });
+                Network.conn[1].send({ type: 'START', yourId: 2, gameType: Game.gameType });
+                setTimeout(() => {
+                    Network.broadcast({ type: 'STATE', state: { players: Game.players, round: Game.round } });
+                    updateUI();
+                }, 500);
+            }
+        }
+
+        let tempAction = null;
+        let tempTarget = null;
+
+        function selectAction(action) {
+            const myIdx = Game.mode === 'online' || Game.mode === 'online-client' ? Game.myPlayerId : Game.currentPlayerIndex;
+            const p = Game.players[myIdx];
+            
+            if (!p.alive) return;
+
+            if (action === 'shoot' && p.ammo < 1) {
+                AudioEngine.empty();
+                showMessage("Clique! Sem munição!");
+                return;
+            }
+            if (action === 'reload' && p.ammo >= p.maxAmmo) {
+                AudioEngine.empty();
+                showMessage("Cartucheira cheia!");
+                return;
+            }
+
+            AudioEngine.click();
+            tempAction = action;
+            tempTarget = null;
+            document.querySelectorAll('#player-controls .card').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`btn-${action}`).classList.add('selected');
+
+            if (action === 'shoot' || action === 'steal') {
+                showMessage("Escolha seu alvo!");
+                document.getElementById('target-msg').classList.remove('hidden');
+                document.getElementById('btn-confirm').classList.add('hidden');
+                enableTargeting(p.id);
+            } else {
+                showMessage("Confirme sua ação");
+                document.getElementById('target-msg').classList.add('hidden');
+                document.getElementById('btn-confirm').classList.remove('hidden');
+                disableTargeting();
+            }
+        }
+
+        function enableTargeting(shooterId) {
+            const targets = Game.players.filter(pl => pl.id !== shooterId && pl.alive);
+            const myIdx = Game.mode === 'online' || Game.mode === 'online-client' ? Game.myPlayerId : Game.currentPlayerIndex;
+            
+            targets.forEach(t => {
+                let uiElementId = '';
+                const leftId = (myIdx + 1) % 3;
+                const rightId = (myIdx + 2) % 3;
+                if (t.id === leftId) uiElementId = 'p2-avatar';
+                if (t.id === rightId) uiElementId = 'p3-avatar';
+
+                const el = document.getElementById(uiElementId);
+                if (el) {
+                    el.classList.add('targetable');
+                    el.onclick = () => selectTarget(t.id, uiElementId);
+                }
+            });
+        }
+        
+        function disableTargeting() {
+            document.querySelectorAll('.avatar-ring').forEach(el => {
+                el.classList.remove('targetable', 'selected-target');
+                el.onclick = null;
+            });
+        }
+
+        function selectTarget(targetId, uiId) {
+            AudioEngine.click();
+            tempTarget = targetId;
+            document.querySelectorAll('.avatar-ring').forEach(el => el.classList.remove('selected-target'));
+            document.getElementById(uiId).classList.add('selected-target');
+            document.getElementById('target-msg').classList.add('hidden');
+            document.getElementById('btn-confirm').classList.remove('hidden');
+            showMessage("Alvo na mira. Fogo?");
+        }
+
+        function confirmTurn() {
+            AudioEngine.click();
+            const myIdx = Game.mode === 'online' || Game.mode === 'online-client' ? Game.myPlayerId : Game.currentPlayerIndex;
+            const p = Game.players[myIdx];
+            
+            document.querySelectorAll('#player-controls .card').forEach(el => el.classList.remove('selected'));
+            document.getElementById('btn-confirm').classList.add('hidden');
+            disableTargeting();
+
+            if (Game.mode === 'pve') {
+                p.action = tempAction;
+                p.target = tempTarget;
+                resolveAiTurns();
+                resolveRound();
+            } 
+            else if (Game.mode === 'pvp') {
+                p.action = tempAction;
+                p.target = tempTarget;
+                nextPvPTurn();
+            }
+            else if (Game.mode === 'online') {
+                p.action = tempAction;
+                p.target = tempTarget;
+                document.getElementById('msg-waiting').classList.remove('hidden');
+                Game.checkNetworkTurn();
+            } else if (Game.mode === 'online-client') {
+                document.getElementById('action-cards-container').classList.add('hidden');
+                document.getElementById('msg-waiting').classList.remove('hidden');
+                document.getElementById('msg-waiting').innerText = "Enviado! Aguardando...";
+                Network.sendAction(tempAction, tempTarget);
+            }
+        }
+
+        function runSpectatorTurn() { 
+            AudioEngine.click();
+            document.getElementById('btn-spectate').classList.add('hidden');
+            resolveAiTurns();
+        }
+
+        function resolveAiTurns() {
+            const isBlefe = Game.gameType === 'bluff';
+            Game.players.forEach(p => {
+                if (p.type === 'ai' && p.alive) {
+                    const targets = Game.players.filter(op => op.id !== p.id && op.alive);
+                    if (targets.length === 0) return;
+
+                    let action = 'shield';
+                    let target = targets[Math.floor(Math.random() * targets.length)].id;
+                    const roll = Math.random();
+
+                    if (p.ammo === 0) {
+                        action = roll > 0.4 ? 'reload' : 'shield';
+                        if(isBlefe && roll < 0.2) { action = 'steal'; target = targets[0].id; }
+                    } else {
+                        if (roll < 0.6) action = 'shoot';
+                        else if (roll < 0.8) action = 'shield';
+                        else action = 'reload';
+                        
+                        if(isBlefe) {
+                            if(roll < 0.5) action = 'shoot';
+                            else if(roll < 0.7) action = 'mirror';
+                            else if(roll < 0.9) { action = 'steal'; target = targets[0].id; }
+                        }
+                    }
+                    p.action = action;
+                    p.target = target;
+                }
+            });
+            // Auto resolve if pve player is dead
+            if (Game.mode === 'pve' && !Game.players[0].alive) {
+                resolveRound();
+            }
+        }
+
+        function startTurnPvP() {
+             document.getElementById('screen-game').classList.add('hidden-screen');
+             document.getElementById('screen-interstitial').classList.remove('hidden-screen');
+             document.getElementById('next-player-name').innerText = Game.players[Game.currentPlayerIndex].name;
+             if (!Game.players[Game.currentPlayerIndex].alive) {
+                 Game.players[Game.currentPlayerIndex].action = 'dead';
+                 nextPvPTurn(); 
+             }
+        }
+        function revealTurn() {
+            AudioEngine.click();
+            document.getElementById('screen-interstitial').classList.add('hidden-screen');
+            document.getElementById('screen-game').classList.remove('hidden-screen');
+            updateUI();
+        }
+        function nextPvPTurn() {
+            Game.currentPlayerIndex++;
+            if (Game.currentPlayerIndex >= 3) {
+                Game.currentPlayerIndex = 2; 
+                document.getElementById('screen-game').classList.add('hidden-screen');
+                document.getElementById('screen-interstitial').classList.remove('hidden-screen');
+                document.getElementById('next-player-name').innerText = "Todos os Jogadores";
+                document.querySelector('#screen-interstitial p').innerText = "Preparem-se para o duelo...";
+                const btn = document.querySelector('#screen-interstitial button');
+                btn.innerText = "Revelar Resultado";
+                btn.onclick = () => {
+                    AudioEngine.click();
+                    document.getElementById('screen-interstitial').classList.add('hidden-screen');
+                    document.getElementById('screen-game').classList.remove('hidden-screen');
+                    btn.innerText = "Estou Pronto";
+                    btn.onclick = revealTurn;
+                    document.querySelector('#screen-interstitial p').innerText = "Passe o dispositivo para:";
+                    playCutscene("SHOWDOWN");
+                    setTimeout(resolveRound, 2000);
+                };
+            } else {
+                if (!Game.players[Game.currentPlayerIndex].alive) {
+                    Game.players[Game.currentPlayerIndex].action = 'dead';
+                    nextPvPTurn(); 
+                } else {
+                    startTurnPvP();
+                }
+            }
+        }
+
+        function resolveRound() {
+            Game.state = 'resolve';
+            const cardArea = document.getElementById('resolution-area');
+            cardArea.style.opacity = '1';
+            
+            // Host logic (or PvE/PvP)
+            const p1 = Game.players[0]; const p2 = Game.players[1]; const p3 = Game.players[2];
+            document.getElementById('card-p1').innerText = ACTION_ICONS[p1.action] || '💀';
+            document.getElementById('card-p2').innerText = ACTION_ICONS[p2.action] || '💀';
+            document.getElementById('card-p3').innerText = ACTION_ICONS[p3.action] || '💀';
+
+            let logs = [];
+            let dmgMap = {0:0, 1:0, 2:0};
+
+            Game.players.forEach(p => {
+                if (!p.alive) return;
+                if (p.action === 'shoot') { p.ammo--; AudioEngine.shoot(); triggerFlash(p.id); }
+                if (p.action === 'shield') AudioEngine.shield();
+                if (p.action === 'reload') AudioEngine.reload();
+            });
+
+            // LOGIC - SHOOT
+            Game.players.forEach(shooter => {
+                if (shooter.alive && shooter.action === 'shoot' && shooter.target !== null) {
+                    const target = Game.players.find(p => p.id === shooter.target);
+                    if (target && target.alive) {
+                        let blocked = target.action === 'shield';
+                        let reflected = target.action === 'mirror';
+                        
+                        if (blocked) logs.push(`${shooter.name} atirou em ${target.name} (BLOQUEADO)`);
+                        else if (reflected) {
+                            logs.push(`${target.name} refletiu o tiro de ${shooter.name}!`);
+                            dmgMap[shooter.id]++;
+                        } else {
+                            // Check Steal
+                            const thieves = Game.players.filter(t => t.alive && t.action === 'steal' && t.target === shooter.id);
+                            thieves.forEach(thief => {
+                                logs.push(`${thief.name} tentou roubar ${shooter.name} e morreu!`);
+                                dmgMap[thief.id] += 3;
+                            });
+                            logs.push(`${shooter.name} acertou ${target.name}!`);
+                            dmgMap[target.id]++;
+                        }
+                    }
+                }
+            });
+
+            // LOGIC - MIRROR FAIL
+            Game.players.forEach(p => {
+                if (p.alive && p.action === 'mirror') {
+                    const wasShot = Game.players.some(s => s.alive && s.action === 'shoot' && s.target === p.id);
+                    if (!wasShot) { logs.push(`${p.name} se expôs com o espelho!`); dmgMap[p.id]++; }
+                }
+            });
+
+            // LOGIC - STEAL
+            Game.players.forEach(thief => {
+                if (thief.alive && thief.action === 'steal' && thief.target !== null) {
+                    const target = Game.players.find(p => p.id === thief.target);
+                    if (target && target.alive && target.action === 'reload') {
+                        logs.push(`${thief.name} roubou ${target.name}!`);
+                        if (thief.ammo < thief.maxAmmo) thief.ammo++;
+                        target.action = 'robbed';
+                    }
+                }
+            });
+
+            // LOGIC - RELOAD
+            Game.players.forEach(p => {
+                if (p.alive && p.action === 'reload' && dmgMap[p.id] === 0) {
+                    if (p.ammo < p.maxAmmo) p.ammo++;
+                }
+            });
+
+            // APPLY DAMAGE
+            for (let id in dmgMap) {
+                if (dmgMap[id] > 0) {
+                    const p = Game.players[id];
+                    if (p && p.alive) {
+                        p.hp -= dmgMap[id];
+                        triggerShake();
+                        if (p.hp <= 0) { p.hp = 0; p.alive = false; }
+                    }
+                }
+            }
+            if (logs.length === 0) logs.push("Silêncio no saloon...");
+            
+            let delay = 0;
+            logs.forEach((log) => { setTimeout(() => showMessage(log), delay); delay += 1500; });
+
+            if (Game.mode === 'online') {
+                const finalState = { players: Game.players, round: Game.round };
+                Network.broadcast({ type: 'SHOWDOWN', logs, dmgMap, finalState });
+            }
+
+            setTimeout(() => {
+                cardArea.style.opacity = '0';
+                checkWinCondition();
+            }, delay + 1000);
+        }
+
+        function checkWinCondition() {
+            const isBlefe = Game.gameType === 'bluff';
+            const survivors = Game.players.filter(p => p.alive);
+            let gameOver = false;
+            let winners = [];
+            let msg = "";
+
+            if (isBlefe) {
+                const outlaw = Game.players.find(p => p.role === 'outlaw');
+                const hunters = Game.players.filter(p => p.role === 'hunter');
+                if (!outlaw.alive) { gameOver = true; winners = hunters; msg = "Os Caçadores venceram!"; }
+                else if (hunters.filter(h => h.alive).length === 0) { gameOver = true; winners = [outlaw]; msg = "O Foragido escapou!"; }
+            } else {
+                if (survivors.length <= 1) {
+                    gameOver = true;
+                    winners = survivors;
+                    msg = survivors.length === 1 ? `${survivors[0].name} venceu!` : "Ninguém sobreviveu.";
+                }
+            }
+
+            if (gameOver) {
+                if (Game.mode === 'online') {
+                     // Wait a bit then broadcast
+                     setTimeout(() => {
+                         Network.broadcast({ type: 'GAMEOVER', winners, reason: msg, state: { players: Game.players, round: Game.round } });
+                         endGame(winners, msg);
+                     }, 2000);
+                } else {
+                    endGame(winners, msg);
+                }
+            } else {
+                nextRound();
+            }
+        }
+        
+        function nextRound() {
+            Game.round++;
+            document.getElementById('round-counter').innerText = Game.round;
+            Game.players.forEach(p => { p.action = null; p.target = null; });
+            Game.netActionsReceived = 0;
+            
+            if (Game.mode === 'pvp') {
+                Game.currentPlayerIndex = 0;
+                startTurnPvP();
+            } else if (Game.mode === 'online') {
+                Network.broadcast({ type: 'STATE', state: { players: Game.players, round: Game.round } });
+                Game.syncState({ players: Game.players, round: Game.round });
+                showMessage("Nova rodada...");
+            } else if (Game.mode === 'pve') {
+                Game.currentPlayerIndex = 0;
+                updateUI();
+                showMessage("Nova rodada...");
+            }
+        }
+
+        // --- UI UPDATES ---
+        
+        function renderActionCards() {
+            const container = document.getElementById('action-cards-container');
+            if (!container) return;
+
+            const isBlefe = Game.gameType === 'bluff';
+            
+            // Reconfigure Grid
+            if (isBlefe) {
+                container.classList.remove('grid-cols-3');
+                container.classList.add('grid-cols-4');
+                container.classList.add('grid-dynamic'); // Helper class
+            } else {
+                container.classList.remove('grid-cols-4');
+                container.classList.add('grid-cols-3');
+            }
+
+            container.innerHTML = ''; // Clear existing
+
+            // Define Buttons
+            const btnClass = "card group flex flex-col items-center justify-center relative overflow-hidden h-32";
+            
+            const createBtn = (id, icon, name, sub) => `
+                <button id="btn-${id}" onclick="selectAction('${id}')" class="${btnClass}">
+                    <div class="text-3xl mb-1 group-hover:scale-110 transition-transform">${icon}</div>
+                    <div class="font-bold text-xs uppercase tracking-widest">${name}</div>
+                    <div class="text-[9px] leading-none mt-1 opacity-70 text-center px-1">${sub}</div>
+                </button>
+            `;
+
+            let html = createBtn('shoot', '🔫', 'Atirar', '1 Bala');
+            
+            if (isBlefe) {
+                html += createBtn('reload', '🔄', 'Recarregar', '+1 Bala');
+                html += createBtn('mirror', '🪞', 'Espelho', 'Reflete Tiro');
+                html += createBtn('steal', '💰', 'Roubo', 'Rouba Recarga');
+            } else {
+                html += createBtn('shield', '🛡️', 'Escudo', 'Bloqueia');
+                html += createBtn('reload', '🔄', 'Recarregar', '+1 Bala');
+            }
+
+            container.innerHTML = html;
+        }
+
+        function updateUI() {
+            // Determine "My" player based on Mode
+            let myIdx = Game.currentPlayerIndex;
+            if (Game.mode === 'online' || Game.mode === 'online-client') {
+                myIdx = Game.myPlayerId;
+            }
+
+            const currentP = Game.players[myIdx];
+            const isBlefe = Game.gameType === 'bluff';
+
+            // Update Player Controls Area
+            let pTitle = currentP.name;
+            if (isBlefe) {
+                 const roleIcon = currentP.role === 'outlaw' ? '🤠 FORAGIDO' : (currentP.role === 'hunter' ? '👮 CAÇADOR' : '');
+                 pTitle += ` • ${roleIcon}`;
+            }
+            document.getElementById('p1-name').innerText = pTitle;
+            
+            // Stats Display (Ammo & Hearts)
+            const statsContainer = document.getElementById('p1-ammo-display');
+            statsContainer.innerHTML = '';
+            
+            // Render Hearts
+            const heartsDiv = document.createElement('div');
+            heartsDiv.className = "flex gap-1 mr-4";
+            for(let i=0; i<currentP.maxHp; i++) {
+                 const h = document.createElement('span');
+                 h.className = i < currentP.hp ? "heart" : "heart lost";
+                 h.innerText = "♥";
+                 heartsDiv.appendChild(h);
+            }
+            statsContainer.appendChild(heartsDiv);
+
+            // Render Ammo
+            for(let i=0; i<currentP.ammo; i++) {
+                const bullet = document.createElement('div');
+                bullet.className = "w-2 h-6 bg-yellow-500 rounded-sm border border-yellow-700 shadow-sm";
+                statsContainer.appendChild(bullet);
+            }
+
+            // Death Handling
+            if (!currentP.alive) {
+                if (Game.mode === 'pve') {
+                    // Spectator Button
+                     document.getElementById('btn-spectate').classList.remove('hidden');
+                     showMessage("Você morreu. Espectador.");
+                } else {
+                    // Online/PvP - Just wait
+                    showMessage("Você morreu.");
+                    document.getElementById('msg-waiting').classList.remove('hidden');
+                    document.getElementById('msg-waiting').innerText = "Espectador...";
+                }
+                document.getElementById('action-cards-container').classList.add('hidden');
+                document.getElementById('action-prompt').classList.remove('hidden');
+                document.getElementById('btn-confirm').classList.add('hidden');
+                document.getElementById('target-msg').classList.add('hidden');
+            } else {
+                document.getElementById('btn-spectate').classList.add('hidden');
+                // Ensure cards are visible if alive (and not waiting)
+                if ((Game.mode === 'online-client' && !currentP.action) || Game.mode === 'pve' || Game.mode === 'online') {
+                     document.getElementById('action-cards-container').classList.remove('hidden');
+                }
+            }
+
+            const leftIdx = (myIdx + 1) % 3;
+            const rightIdx = (myIdx + 2) % 3;
+            updateOpponentSlot('p2', Game.players[leftIdx]);
+            updateOpponentSlot('p3', Game.players[rightIdx]);
+        }
+
+        function updateOpponentSlot(slotId, player) {
+            const isBlefe = Game.gameType === 'bluff';
+            
+            // Name & Role
+            let nameDisplay = player.name;
+            document.getElementById(`${slotId}-name`).innerText = nameDisplay;
+            
+            // Ammo Count
+            document.getElementById(`${slotId}-ammo`).innerText = player.ammo;
+
+            // Avatar & Health
+            const avatarEl = document.getElementById(`${slotId}-avatar`);
+            avatarEl.innerHTML = ''; // Clear
+
+            // Rebuild Avatar Content
+            if (player.alive) {
+                avatarEl.classList.remove('grayscale');
+                avatarEl.style.backgroundColor = '#1e293b';
+                
+                // Main Avatar Icon
+                const icon = document.createElement('div');
+                icon.innerText = player.avatar;
+                avatarEl.appendChild(icon);
+
+                // Role Badge (Overlay)
+                if (isBlefe) {
+                    const badge = document.createElement('div');
+                    badge.className = `absolute -top-2 -left-2 w-6 h-6 flex items-center justify-center rounded-full text-xs shadow-md border ${player.role === 'outlaw' ? 'bg-red-900 border-red-500' : 'bg-blue-900 border-blue-500'}`;
+                    badge.innerText = player.role === 'outlaw' ? '💀' : '🛡️';
+                    avatarEl.appendChild(badge);
+                }
+
+                // Hearts Row
+                const heartsRow = document.createElement('div');
+                heartsRow.className = "absolute -bottom-1 left-1/2 transform -translate-x-1/2 flex text-[10px] space-x-[1px] bg-black/50 rounded px-1";
+                for(let i=0; i<player.maxHp; i++) {
+                     const h = document.createElement('span');
+                     h.className = i < player.hp ? "heart" : "heart lost";
+                     h.innerText = "♥";
+                     heartsRow.appendChild(h);
+                }
+                avatarEl.appendChild(heartsRow);
+
+            } else {
+                avatarEl.classList.add('grayscale');
+                avatarEl.style.backgroundColor = '#2a1a12';
+                avatarEl.innerText = '💀';
+            }
+            
+            // Flash div
+            const flash = document.createElement('div');
+            flash.id = `${slotId}-flash`;
+            flash.className = "absolute inset-0 bg-yellow-200 opacity-0 pointer-events-none";
+            avatarEl.appendChild(flash);
+            
+            // Status text
+            const statusEl = document.getElementById(`${slotId}-action-display`);
+            statusEl.innerText = player.alive ? (player.action ? "Pronto" : "Pensando...") : "Eliminado";
+        }
+
+        function showMessage(msg) {
+            document.getElementById('game-message').innerText = msg;
+        }
+
+        function triggerFlash(playerId) {
+            let myIdx = Game.currentPlayerIndex;
+            if (Game.mode === 'online' || Game.mode === 'online-client') {
+                myIdx = Game.myPlayerId;
+            }
+
+            // Flash screen if it's me
+            if (playerId === myIdx) {
+                const gameDiv = document.getElementById('screen-game');
+                gameDiv.classList.add('flash');
+                setTimeout(() => gameDiv.classList.remove('flash'), 100);
+                return;
+            }
+
+            // Flash opponent avatar
+            const leftId = (myIdx + 1) % 3;
+            const rightId = (myIdx + 2) % 3;
+            let slot = null;
+
+            if (playerId === leftId) slot = 'p2';
+            else if (playerId === rightId) slot = 'p3';
+
+            if (slot) {
+                const el = document.getElementById(`${slot}-flash`);
+                if (el) {
+                    el.style.opacity = '1';
+                    setTimeout(() => el.style.opacity = '0', 100);
+                }
+            }
+        }
+
+        function triggerShake() {
+             document.body.classList.add('shake');
+             setTimeout(() => document.body.classList.remove('shake'), 500);
+        }
+
+        function endGame(winners, msg) {
+            document.getElementById('screen-game').classList.add('hidden-screen');
+            document.getElementById('screen-gameover').classList.remove('hidden-screen');
+            
+            document.getElementById('end-reason').innerText = msg;
+            document.getElementById('winner-display').innerText = winners.map(w => w.avatar).join(' ');
+
+            let myIdx = 0;
+            if (Game.mode === 'online' || Game.mode === 'online-client') {
+                myIdx = Game.myPlayerId;
+            }
+
+            let iWon = false;
+            if (Game.mode === 'pvp') iWon = true; 
+            else {
+                 iWon = winners.some(w => w.id === myIdx);
+            }
+
+            if(iWon) AudioEngine.win();
+            else AudioEngine.lose();
+        }
+
+    </script>
+</body>
+</html>
